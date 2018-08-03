@@ -5,7 +5,14 @@ This likely will not work out of the box with every netcdf file. Variable names 
 
 To run this code as is, you will need to save the following variables from your simulation:
 
-time; U, V, and W; Cartesian x, y, and z; x, y, and z vorticity; Streamwise Vorticity; Reflectivity; Potential Temperature Perturbation; Pressure Perturbation
+time; 
+U, V, and W; 
+Cartesian x, y, and z;
+x, y, and z vorticity; 
+Streamwise Vorticity; 
+Reflectivity; 
+Potential Temperature Perturbation; 
+Pressure Perturbation;
 
 Other necessary variables will be derived within the script.
 
