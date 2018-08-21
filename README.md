@@ -20,4 +20,4 @@ x0, y0, and z0 (position of radar) currently need to be directly modified in the
 
 In the PPI plotter blocks, the "my_radar" line calls the radar class that compiles the algorithms. This line will need to be edited for the desired radar specifications. Specifically, radar location relative to origin, range max/min and resolution (step), azimuth max/min and resolution (step), elevation (zenith) max/min and resolution (step).
 
-Note that PPI plots currently only show winds accounting for U and V. The W component of the wind will be added shortly.
+W component of the wind is now accounted for in the calculations.
