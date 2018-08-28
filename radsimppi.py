@@ -25,7 +25,6 @@ from scipy.ndimage import gaussian_filter
 import matplotlib.patheffects as PathEffects
 from scipy.interpolate import spline
 from scipy.interpolate import RegularGridInterpolator
-get_ipython().magic('matplotlib inline')
 
 print('Running script for PPI only')
 
