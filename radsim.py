@@ -171,15 +171,18 @@ for enum,f in enumerate(range(450,451)): #looping through files
 print(a.variables.keys())    
 
 
-# In[5]:
+# In[9]:
 
 #setting variables from netcdf file
 
 time = a.variables["time"][0]
 
-u = a.variables["uinterp"][0,:,:,:] #use actual winds not storm-relative winds 
-v = a.variables["vinterp"][0,:,:,:]
+u = a.variables["uinterp"][0,:,:,:] + 15.2 #use actual winds not storm-relative winds 
+v = a.variables["vinterp"][0,:,:,:] + 10.5
 w = a.variables["winterp"][0,:,:,:]
+
+u_sr = a.variables["uinterp"][0,:,:,:]
+v_sr = a.variables["vinterp"][0,:,:,:]
 
 zvort = a.variables["zvort"][0,:,:,:]
 yvort = a.variables["yvort"][0,:,:,:]
@@ -197,12 +200,10 @@ theta = a.variables["thrhopert"][0,:,:,:]
 ppert = a.variables["prespert"][0,:,:,:]
 
 
-# In[6]:
+# In[10]:
 
 # New and improved PPI routine. Light years faster than previous iteration. The following class takes care of
 # all calculations
-
-print('Runnning PPI computations')
 ref_norm, ref_cmap = ctables.registry.get_with_range('NWSStormClearReflectivity', -5, 65)
 ref_new_cmap = truncate_colormap(ref_cmap, 0.25,1.02)
 
@@ -270,7 +271,7 @@ class Radar(object):
         
         return ran, az, refl_ppi
     
-    def get_radial_velocity(self, interp_u, interp_v, az):
+    def get_radial_velocity(self, interp_u, interp_v, interp_w, az, elev):
         """Get the radial velocity from the U and V components pre-interpolated
         onto our polar coordinate grid. Must have already been passed to the RegularGridInterpolator
         so that it's on the radar grid."""
@@ -299,39 +300,45 @@ class Radar(object):
         ## quadrant 4
         uproj[quad4_idxs] = interp_u[quad4_idxs]*(1.-np.sin(np.deg2rad(360-az[quad4_idxs])))
         vproj[quad4_idxs] = -interp_v[quad4_idxs]*(1.-np.cos(np.deg2rad(az[quad4_idxs])))
+        
+        wproj = interp_w*(1.-np.cos(np.deg2rad(90-elev)))
 
-        Vr = uproj + vproj
+        Vr = uproj + vproj + wproj
         return Vr
     
-    def interp_radial_velocity_to_ppi(self, x, y, z, u, v, elevation=0):
+    def interp_radial_velocity_to_ppi(self, x, y, z, u, v, w, elevation=0):
         interp3d_u = RegularGridInterpolator((z, y, x), u, method="linear", bounds_error=False, fill_value=None)
         interp3d_v = RegularGridInterpolator((z, y, x), v, method="linear", bounds_error=False, fill_value=None)
-        
+        interp3d_w = RegularGridInterpolator((z, y, x), w, method="linear", bounds_error=False, fill_value=None)
         ran, az, xrad, yrad, zrad = self.get_radar_ppi_grid(elevation=elevation)
         
         points = [zrad, yrad, xrad]
         flat = np.array([m.flatten() for m in points])
         out_array_u = interp3d_u(flat.T)
         out_array_v = interp3d_v(flat.T)
+        out_array_w = interp3d_w(flat.T)
         u_ppi = out_array_u.reshape(*points[0].shape)
         v_ppi = out_array_v.reshape(*points[0].shape)
+        w_ppi = out_array_w.reshape(*points[0].shape)
 
-        Vr = self.get_radial_velocity(u_ppi, v_ppi, az)
+        Vr = self.get_radial_velocity(u_ppi, v_ppi, w_ppi, az, elevation)
         return ran, az, Vr
         
 
 
-# In[ ]:
+# In[11]:
 
 #plotter for reflectivity PPI
-print('Scanning for reflectivity (PPI)')
+
 ## construct the figure
+
+print('Scanning for reflectivity')
 fig = plt.figure(figsize=(19.5, 15))
 ax = plt.gca()
 plt.subplot(projection='polar')
 
 ## create and initialize our radar
-my_radar = Radar(x0=4, y0=-5, azmin=0, azmax=360, rmin=2.1, azstep=0.01, range_step=0.01)
+my_radar = Radar(x0=4, y0=-5, azmin=0, azmax=360, rmin=2.1, rstep=0.0375, azstep=1)
 
 # get the reflectivity plot
 ran, az, refl_ppi = my_radar.interp_reflectivity_to_ppi(x, y, z, ref, elevation=0)
@@ -339,37 +346,72 @@ ran, az, refl_ppi = my_radar.interp_reflectivity_to_ppi(x, y, z, ref, elevation=
 ## plot the radar PPI
 plt.pcolormesh(np.deg2rad(az), ran, refl_ppi, vmin=0, vmax=75, cmap=ref_new_cmap)
 
-plt.savefig('ppirefscan.png')
 plt.colorbar()
+plt.savefig('ppirefgrel.png')
 plt.grid()
 plt.show()
+
 print('Reflectivity scan complete')
 
 
-# In[8]:
+# In[16]:
 
 #plotter for radial velocity PPI
 
-print('Scanning for radial velocity (PPI)')
+print('Scanning for radial velocity')
+
 ## construct the figure
 fig = plt.figure(figsize=(19.5, 15))
 ax = plt.gca()
 plt.subplot(projection='polar')
 
 ## create and initialize our radar
-my_radar = Radar(x0=4, y0=-5, azmin=0, azmax=360, rmin=2.1, azstep=0.5)
+my_radar = Radar(x0=4, y0=-5, azmin=0, azmax=360, rmin=2.1, rstep=0.0375, azstep=1)
 
 ## get the radial velocity plot
-ran, az, Vr = my_radar.interp_radial_velocity_to_ppi(x, y, z, u, v, elevation=0)
+ran, az, Vr = my_radar.interp_radial_velocity_to_ppi(x, y, z, u, v, w, elevation=0)
 
 ## plot the radar PPI
-plt.pcolormesh(np.deg2rad(az), ran, Vr, vmin=-80, vmax=80, cmap=vel_cmap)
+plt.pcolormesh(np.deg2rad(az), ran, Vr, vmin=-60, vmax=60, cmap=vel_cmap)
 
-plt.savefig('ppivelscan.png')
 plt.colorbar()
+plt.title('Ground-Relative Radial Velocity')
+plt.savefig('ppiGRV.png')
 plt.grid()
 plt.show()
+
 print('Radial velocity scan complete')
+print('Done')
+
+
+# In[17]:
+
+#plotter for radial velocity PPI
+
+print('Scanning for storm-relative radial velocity')
+
+## construct the figure
+fig = plt.figure(figsize=(19.5, 15))
+ax = plt.gca()
+plt.subplot(projection='polar')
+
+## create and initialize our radar
+my_radar = Radar(x0=4, y0=-5, azmin=0, azmax=360, rmin=2.1, rstep=0.0375, azstep=1)
+
+## get the radial velocity plot
+ran, az, Vr = my_radar.interp_radial_velocity_to_ppi(x, y, z, u_sr, v_sr, w, elevation=0)
+
+## plot the radar PPI
+plt.pcolormesh(np.deg2rad(az), ran, Vr, vmin=-60, vmax=60, cmap=vel_cmap)
+
+plt.colorbar()
+plt.title('Storm-realtive Radial Velocity')
+plt.savefig('ppiSRV.png')
+plt.grid()
+plt.show()
+
+print('Radial velocity scan complete')
+print('Done')
 
 
 # In[9]:
